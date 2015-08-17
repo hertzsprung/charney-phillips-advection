@@ -15,7 +15,9 @@ typedef struct
 
 void initialise(FieldField<Field, scalar>& phi, const geometry& mesh);
 void write(const FieldField<Field, scalar>& phi, dimensionedScalar t, const geometry& mesh);
-scalar grad(const FieldField<Field, scalar>& phi, const label I, const label K, const geometry& mesh);
+scalar grad_x(const FieldField<Field, scalar>& phi, const label I, const label K, const geometry& mesh);
+scalar grad_z(const FieldField<Field, scalar>& phi, const label I, const label K, const geometry& mesh);
+int modulo(int a, int b);
 
 int main(int argc, char *argv[])
 {
@@ -34,10 +36,11 @@ int main(int argc, char *argv[])
        dimensionedScalar("dz", (mesh.z_max - mesh.z_min)/mesh.nz),
     };
 
-    const dimensionedScalar u0("u0", dimVelocity, 10);
-    const dimensionedScalar cx("cx", u0 * dt / mesh.dx);
+    const dimensionedVector u0("u0", dimVelocity, vector(10,0,0.5));
+    const scalar cx = (u0[0] * dt / mesh.dx).value();
+    const scalar cz = (u0[2] * dt / mesh.dz).value();
 
-    Info << "# t x theta" << endl;
+    Info << "# t x z theta" << endl;
    
     FieldField<Field,scalar> theta(mesh.nz+1);
     FieldField<Field,scalar> theta_new(mesh.nz+1);
@@ -56,7 +59,9 @@ int main(int argc, char *argv[])
             {
                 forAll(theta_new[K], I)
                 {
-                    theta_new[K][I] = theta[K][I] - 0.5*cx.value()*(grad(theta_new, I, K, mesh) + grad(theta, I, K, mesh));
+                    theta_new[K][I] = theta[K][I] - 0.5*(
+                        cx*(grad_x(theta_new, I, K, mesh) + grad_x(theta, I, K, mesh)) + 
+                        cz*(grad_z(theta_new, I, K, mesh) + grad_z(theta, I, K, mesh)));
                 }
             }
         }
@@ -74,9 +79,19 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-scalar grad(const FieldField<Field, scalar>& phi, const label I, const label K, const geometry& mesh)
+scalar grad_x(const FieldField<Field, scalar>& phi, const label I, const label K, const geometry& mesh)
 {
-    return 0.5*(phi[K][(I+1)%mesh.nx] - phi[K][(I-1)%mesh.nx]);
+    return 0.5*(phi[K][modulo(I+1, mesh.nx)] - phi[K][modulo(I-1, mesh.nx)]);
+}
+
+scalar grad_z(const FieldField<Field, scalar>& phi, const label I, const label K, const geometry& mesh)
+{
+    return 0.5*(phi[modulo(K+1, mesh.nz+1)][I] - phi[modulo(K-1, mesh.nz+1)][I]);
+}
+
+int modulo(int a, int b)
+{
+    return ((a % b) + b) % b;
 }
 
 void initialise(FieldField<Field,scalar>& phi, const geometry& mesh)
