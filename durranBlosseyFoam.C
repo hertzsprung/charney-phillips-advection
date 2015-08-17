@@ -13,8 +13,9 @@ typedef struct
     const dimensionedScalar& dz;
 } geometry;
 
-void initialise(FieldField<Field,scalar>& phi, const geometry& mesh);
-void write(FieldField<Field,scalar>& phi, dimensionedScalar t, const geometry& mesh);
+void initialise(FieldField<Field, scalar>& phi, const geometry& mesh);
+void write(const FieldField<Field, scalar>& phi, dimensionedScalar t, const geometry& mesh);
+scalar grad(const FieldField<Field, scalar>& phi, const label I, const label K, const geometry& mesh);
 
 int main(int argc, char *argv[])
 {
@@ -34,45 +35,48 @@ int main(int argc, char *argv[])
     };
 
     const dimensionedScalar u0("u0", dimVelocity, 10);
-    const dimensionedScalar cx("c", u0 * dt / mesh.dx);
+    const dimensionedScalar cx("cx", u0 * dt / mesh.dx);
 
     Info << "# t x theta" << endl;
    
-    FieldField<Field,scalar> theta_old(mesh.nz+1);
     FieldField<Field,scalar> theta(mesh.nz+1);
     FieldField<Field,scalar> theta_new(mesh.nz+1);
 
     dimensionedScalar t("t", dimTime, 0);
     initialise(theta, mesh);
-    initialise(theta_old, mesh);
     initialise(theta_new, mesh);
     write(theta, t, mesh);
 
-    scalar dt_multiplier = 0.5; // forward-in-time for the first timestep
-
     while (runTime.loop())
     {
-        forAll(theta_new, K)
+        Info << "# " << runTime.timeName() << endl;
+        for (int corr=0; corr < 3; corr++)
         {
-            forAll(theta_new[K], I)
+            forAll(theta_new, K)
             {
-                theta_new[K][I] = theta_old[K][I] - dt_multiplier*cx.value()*(theta[K][(I+1)%mesh.nx] - theta[K][(I-1)%mesh.nx]);
+                forAll(theta_new[K], I)
+                {
+                    theta_new[K][I] = theta[K][I] - 0.5*cx.value()*(grad(theta_new, I, K, mesh) + grad(theta, I, K, mesh));
+                }
             }
         }
 
         t += dt;
-        dt_multiplier = 1;
 
         if (static_cast<int>(t.value()) % 5000 == 0)
         {
             write(theta_new, t, mesh);
         }
 
-        theta_old = theta;
         theta = theta_new;
     }
 
     return 0;
+}
+
+scalar grad(const FieldField<Field, scalar>& phi, const label I, const label K, const geometry& mesh)
+{
+    return 0.5*(phi[K][(I+1)%mesh.nx] - phi[K][(I-1)%mesh.nx]);
 }
 
 void initialise(FieldField<Field,scalar>& phi, const geometry& mesh)
@@ -97,7 +101,7 @@ void initialise(FieldField<Field,scalar>& phi, const geometry& mesh)
     }
 }
 
-void write(FieldField<Field,scalar>& phi, dimensionedScalar t, const geometry& mesh)
+void write(const FieldField<Field,scalar>& phi, dimensionedScalar t, const geometry& mesh)
 {
     dimensionedScalar z = mesh.z_min;
     forAll(phi, K)
