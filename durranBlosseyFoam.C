@@ -13,8 +13,8 @@ typedef struct
     const dimensionedScalar& dz;
 } geometry;
 
-void initialise(Field< Field<scalar> >& phi, const geometry& mesh);
-void write(Field< Field<scalar> >& phi, dimensionedScalar t, const geometry& mesh);
+void initialise(FieldField<Field,scalar>& phi, const geometry& mesh);
+void write(FieldField<Field,scalar>& phi, dimensionedScalar t, const geometry& mesh);
 
 int main(int argc, char *argv[])
 {
@@ -38,9 +38,9 @@ int main(int argc, char *argv[])
 
     Info << "# t x theta" << endl;
    
-    Field< Field<scalar> > theta_old(mesh.nz+1);
-    Field< Field<scalar> > theta(mesh.nz+1);
-    Field< Field<scalar> > theta_new(mesh.nx);
+    FieldField<Field,scalar> theta_old(mesh.nz+1);
+    FieldField<Field,scalar> theta(mesh.nz+1);
+    FieldField<Field,scalar> theta_new(mesh.nz+1);
 
     dimensionedScalar t("t", dimTime, 0);
     initialise(theta, mesh);
@@ -48,8 +48,6 @@ int main(int argc, char *argv[])
     initialise(theta_new, mesh);
     write(theta, t, mesh);
 
-//    theta_old = theta;
-//    theta_new = theta;
     scalar dt_multiplier = 0.5; // forward-in-time for the first timestep
 
     while (runTime.loop())
@@ -58,7 +56,7 @@ int main(int argc, char *argv[])
         {
             forAll(theta_new[K], I)
             {
-                theta_new[K][I] = theta_old[K][I] - dt_multiplier*cx.value()*(theta[K][(I+1)%mesh.nx] - theta[0][(I-1)%mesh.nx]);
+                theta_new[K][I] = theta_old[K][I] - dt_multiplier*cx.value()*(theta[K][(I+1)%mesh.nx] - theta[K][(I-1)%mesh.nx]);
             }
         }
 
@@ -77,7 +75,7 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void initialise(Field< Field<scalar> >& phi, const geometry& mesh)
+void initialise(FieldField<Field,scalar>& phi, const geometry& mesh)
 {
     dimensionedScalar x0("x0", dimLength, -50e3);
     dimensionedScalar z0("z0", dimLength, 9e3);
@@ -88,7 +86,7 @@ void initialise(Field< Field<scalar> >& phi, const geometry& mesh)
     forAll(phi, K)
     {
         dimensionedScalar x = mesh.x_min + mesh.dx/2;
-        phi[K] = Field<scalar>(mesh.nx); // how is this allocated?  will it always be in scope?  I need to learn me some more C++ :(
+        phi.set(K, new Field<scalar>(mesh.nx));
         forAll(phi[K], I)
         {
             dimensionedScalar r = sqrt(sqr((x-x0)/Ax) + sqr((z-z0)/Az));
@@ -99,7 +97,7 @@ void initialise(Field< Field<scalar> >& phi, const geometry& mesh)
     }
 }
 
-void write(Field< Field<scalar> >& phi, dimensionedScalar t, const geometry& mesh)
+void write(FieldField<Field,scalar>& phi, dimensionedScalar t, const geometry& mesh)
 {
     dimensionedScalar z = mesh.z_min;
     forAll(phi, K)
